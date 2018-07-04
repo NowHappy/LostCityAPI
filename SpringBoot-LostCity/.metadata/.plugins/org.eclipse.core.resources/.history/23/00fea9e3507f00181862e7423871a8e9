@@ -1,0 +1,41 @@
+# server
+server.port = 10000
+server.tomcat.max-threads=10
+
+# build Version
+api.build.version=D01C0120180205
+
+# release Version
+api.release.version=v0.9.1802.1
+
+# db
+spring.datasource.type=com.zaxxer.hikari.HikariDataSource
+spring.datasource.url=jdbc:postgresql://localhost:5432/lost_city
+spring.datasource.username=happy
+spring.datasource.password=1111
+spring.jackson.serialization.WRITE_DATES_AS_TIMESTAMPS=false
+
+# hikari
+spring.datasource.hikari.minimumIdle=10
+spring.datasource.hikari.maximumPoolSize=20
+spring.datasource.hikari.idleTimeout=30000
+spring.datasource.hikari.poolName=SpringBootJPAHikariCP
+spring.datasource.hikari.maxLifetime=2000000
+spring.datasource.hikari.connectionTimeout=30000
+
+# jpa
+spring.jpa.hibernate.connection.provider_class=org.hibernate.hikaricp.internal.HikariCPConnectionProvider
+spring.jpa.properties.hibernate.show_sql=false
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.properties.hibernate.use_sql=true
+spring.jpa.properties.hibernate.id.new_generator_mappings=true
+spring.jpa.properties.hibernate.search.autoregister_listeners=false
+spring.jpa.properties.hibernate.bytecode.use_reflection_optimizer=false
+spring.jpa.properties.hibernate.temp.use_jdbc_metadata_defaults = false
+spring.jpa.generate-ddl=true
+spring.jpa.hibernate.ddl-auto=create
+
+# oauth
+spring.security.oauth2.client.resource.id=fasoo_blockchain_manage_resources
+spring.security.oauth2.client.validity.second.access=14400
+spring.security.oauth2.client.validity.second.refresh=604800

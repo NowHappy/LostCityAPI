@@ -1,0 +1,9 @@
+package com.happy.game.lostcity.common;
+
+public class Snippet {
+	keytool -importcert -alias fasooblock -keystore cacerts -trustcacerts -file /home/ec2-user/fasooblock/ssl/www.fasooblock.com.cer -storepass changeit
+	public static void main(String[] args) {
+		package com.happy.game.lostcity.common;
+	}
+}
+

@@ -1,0 +1,5 @@
+package com.happy.game.lostcity.domain.users;
+
+public interface UserRepository CrudRepository<UserEntity, Long>{
+
+}

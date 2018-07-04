@@ -1,0 +1,8 @@
+package com.happy.game.lostcity.common;
+
+public class Snippet {
+	public static void main(String[] args) {
+		package com.happy.game.lostcity.common;
+	}
+}
+

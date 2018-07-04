@@ -1,0 +1,9 @@
+spring.datasource.url=jdbc:postgresql://localhost:5432/lost_city
+spring.datasource.username=happy
+spring.datasource.password=1111
+spring.jpa.generate-ddl=true
+spring.jpa.hibernate.ddl-auto=create
+spring.jackson.serialization.WRITE_DATES_AS_TIMESTAMPS=false
+
+
+server.port = 10000

@@ -1,0 +1,246 @@
+package com.happy.game.lostcity.domain.users;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import javax.mail.SendFailedException;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Order;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.fasoo.blockchain.common.EncryptUtil;
+import com.fasoo.blockchain.domain.apps.AppDto;
+import com.happy.game.lostcity.common.CustomOAuthTokenExtractor;
+import com.happy.game.lostcity.common.DefineException;
+import com.happy.game.lostcity.config.SecurityConfig;
+
+@EnableJpaAuditing
+@Service
+public class UserService implements UserDetailsService {
+
+	@Autowired
+	private UserRepository userRepo;
+
+	@Autowired
+	private ModelMapper modelMapper;
+
+	@Autowired
+	private CustomOAuthTokenExtractor customOAuthTokenExtractor;
+
+	private final Logger logger = LoggerFactory.getLogger(getClass());
+	
+    private final String ORDER_BY_ASC = "asc";
+    private final String ORDER_BY_DESC = "desc";
+    
+    
+    @Value("${promotion.charge}")
+    private String promotionCharge;
+
+	// UserDetailsService impl
+	public UserDetails loadUserByUsername(String id) {
+		UserEntity user = userRepo.findById(id);
+		if (user == null) {
+			throw new UserDefineException.NotFound(id);
+		}
+		
+		return new org.springframework.security.core.userdetails.User(user.getId(), user.getPwd(),
+				getAuthority(false));
+	}
+
+	// UserDetailsService impl
+	private List<SimpleGrantedAuthority> getAuthority(boolean manager) {
+		if (manager) {
+			return Arrays.asList(new SimpleGrantedAuthority("ADMIN"));
+		} else {
+			return Arrays.asList(new SimpleGrantedAuthority("USER"));
+		}
+	}
+
+	@Transactional
+	public UserDto.UserInfo add(HttpServletRequest httpRequest, UserDto.Create user) {
+		if (userRepo.existsById(user.getId())) {
+			// exist
+			throw new UserDefineException.Duplicated(user.getId(), httpRequest);
+		}
+
+		// add
+		user.setPwd(SecurityConfig.userPasswordEncoder().encode(user.getPwd()));
+		//set initial balance from properties
+
+		UserEntity addUser = modelMapper.map(user, UserEntity.class);
+		
+		
+		addUser = userRepo.save(addUser);
+				
+		
+		
+		return modelMapper.map(addUser, UserDto.UserInfo.class);
+	}
+
+	public UserEntity get(HttpServletRequest httpRequest, final Long users_sid) {
+		return userRepo.findById(users_sid)
+				.orElseThrow(() -> new UserDefineException.NotFound(users_sid, httpRequest));
+	}
+	
+	public UserEntity getById(HttpServletRequest httpRequest, final String id) {
+		return Optional.ofNullable(userRepo.findById(id))
+				.orElseThrow(() -> new UserDefineException.NotFound(id, httpRequest));
+	}
+
+	@Transactional
+	public UserEntity update(HttpServletRequest httpRequest, final Long users_sid, UserDto.UserInfo user) {
+		UserEntity updateUser = get(httpRequest, users_sid);
+		updateUser.setName(user.getName());
+
+		// update
+		return userRepo.save(updateUser);
+	}
+
+
+	@Transactional
+	public void delete(HttpServletRequest httpRequest, final Long users_sid) {
+		UserEntity deleteUser = get(httpRequest, users_sid);
+		customOAuthTokenExtractor.removeAuthToken(deleteUser.getId());
+		userRepo.deleteById(users_sid);
+	}
+	
+	public boolean valid(Sort sort) {
+		
+		return true;
+	}
+
+	public PageImpl<UserDto.UserInfo> search(HttpServletRequest httpRequest, final String search, Pageable pageable) {
+		
+		Sort sort = pageable.getSort();
+		List<Sort.Order> list = new ArrayList<>();
+
+		for (Order order : sort) {
+			if (!UserDto.ParamMapper.sortProperties.containsKey(order.getProperty().toLowerCase())) {
+				throw new DefineException.BadReqeust(httpRequest);
+			}
+			if (!(ORDER_BY_ASC.equalsIgnoreCase(order.getDirection().toString())
+					|| ORDER_BY_DESC.equalsIgnoreCase(order.getDirection().toString()))) {
+				throw new DefineException.BadReqeust(httpRequest);
+			}
+			list.add(new Order(order.getDirection(), UserDto.ParamMapper.sortProperties.get(order.getProperty().toLowerCase())));
+		}
+
+		pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(list));
+		
+		Specification<UserEntity> spec = null;
+		Page<UserEntity> searchUsers = null;
+
+		if (search != null) {
+			UserSpecificationsBuilder builder = new UserSpecificationsBuilder();
+			Pattern pattern = Pattern.compile("(\\w+?)(:|<|>|;)((\\w|[媛�-�옡])+?),");
+			Matcher matcher = pattern.matcher(search + ",");
+			while (matcher.find()) {
+				if(!UserDto.ParamMapper.searchProperties.containsKey(matcher.group(1).toLowerCase())) {
+    				throw new DefineException.BadReqeust(httpRequest);
+    			}
+				builder.with(UserDto.ParamMapper.searchProperties.get(matcher.group(1).toLowerCase()), matcher.group(2), matcher.group(3));
+			}
+			spec = builder.build();
+		}
+
+		if (spec == null) {
+			searchUsers = userRepo.findAll(pageable);
+		} else {
+			searchUsers = userRepo.findAll(spec, pageable);
+		}
+
+		List<UserDto.Response> users = searchUsers.getContent().stream()
+				.map(userEntity -> modelMapper.map(userEntity, UserDto.Response.class)).collect(Collectors.toList());
+
+		return new PageImpl<>(users, pageable, searchUsers.getTotalElements());
+	}
+
+	// changePwd
+	@Transactional
+	public UserEntity changePwd(HttpServletRequest httpRequest, final Long users_sid, UserDto.Password user) {
+		UserEntity updateUser = get(httpRequest, users_sid);
+
+		if (!SecurityConfig.userPasswordEncoder().matches(user.getPwd(), updateUser.getPwd())) {
+			throw new UserDefineException.invalidPwd(updateUser.getEmail(), httpRequest);
+		}
+
+		if (user.getNew_pwd().equals(user.getPwd())) {
+			throw new UserDefineException.samePwd(updateUser.getEmail(), httpRequest);
+		}
+		updateUser.setPwd(SecurityConfig.userPasswordEncoder().encode(user.getNew_pwd()));
+		//
+		// update
+		return userRepo.save(updateUser);
+	}
+
+	// resetPwd
+	@Transactional
+	public UserEntity resetPwd(HttpServletRequest httpRequest, final String users_email) {
+		UserEntity updateUser = getByEmail(httpRequest, users_email);
+
+		String pwd = RandomStringUtils.random(16, true, true);
+
+		// System.out.println(pwd);
+		updateUser.setPwd(SecurityConfig.userPasswordEncoder().encode(pwd));
+
+		// expire user's token
+		if (customOAuthTokenExtractor.removeAuthToken(updateUser.getEmail())) {
+			// send a mail
+			try {
+				emailService.sendMailWhenResetPwd(updateUser.getEmail(), pwd);
+			} catch (SendFailedException e) {
+				logger.error(e.toString());
+				throw new UserDefineException.SendEmailFailed(updateUser.getEmail(), httpRequest);
+			}
+		}
+
+		// update
+		return userRepo.save(updateUser);
+	}
+	
+	//updateServiceFee
+	public UserEntity updateServiceFee(HttpServletRequest httpRequest, final Long users_sid, double serviceFee) {
+		UserEntity updateUser = get(httpRequest, users_sid);
+
+		double updateBalance = updateUser.getBalance() - serviceFee;
+		
+		updateUser.setBalance(updateBalance);
+
+		// update
+		return userRepo.save(updateUser);
+	}
+	
+	// delete Activate_token
+	public UserEntity deleteActivateToken(HttpServletRequest httpRequest, final Long users_sid) {
+		UserEntity fetchedUser = get(httpRequest, users_sid);
+
+		fetchedUser.setActivateToken("");
+
+		// update
+		return userRepo.save(fetchedUser);
+	}
+}

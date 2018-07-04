@@ -1,0 +1,33 @@
+package com.happy.game.lostcity.domain.play;
+
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import lombok.Data;
+
+@Data
+public class GamesDto {
+
+	@Data
+	public static class UserResponse{
+		private Long sid;
+		private String id;
+		@JsonProperty("cards_in_hand")
+		private List<Integer> cardsInHand;
+		@JsonProperty("card_in_point")
+		private List<Integer> cardsInPoint;
+		private List<Integer> yellow;
+		private List<Integer> blue;
+		private List<Integer> white;
+		private List<Integer> green;
+		private List<Integer> red;
+		@JsonProperty("the_other_users_cards_in_point")
+		private List<Integer> theOtherUsersCardsInPoint;
+		private Long score;
+		@JsonProperty("the_other_users_score")
+		private Long theOtherUsersScore;
+	}
+	
+	
+}

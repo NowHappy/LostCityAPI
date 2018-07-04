@@ -1,0 +1,5 @@
+package com.happy.game.lostcity.domain.play;
+
+public interface GameRepository {
+
+}

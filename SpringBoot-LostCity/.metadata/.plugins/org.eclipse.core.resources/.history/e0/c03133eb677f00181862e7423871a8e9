@@ -1,0 +1,82 @@
+package com.happy.game.lostcity.common;
+
+import lombok.AccessLevel;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Setter;
+
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import javax.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+@EntityListeners(AuditingEntityListener.class)
+@Table(name = "oauth_client_details")
+@Data
+@EqualsAndHashCode(callSuper = false)
+public class AppEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "apps_generator")
+    @SequenceGenerator(name = "apps_generator", sequenceName = "oauth_client_details_sid_seq", allocationSize = 1)
+    @Setter(AccessLevel.NONE)
+    @Column(name = "sid")
+    private Long sid;
+
+    @Column(name="client_id")
+    private String clientId;
+
+    @Column(name="resource_ids")
+    private String resourceIds;
+
+    @Column(name="client_secret")
+    private String clientSecret;
+
+    private String scope;
+
+    @Column(name="authorized_grant_types")
+    private String authorizedGrantTypes;
+
+    @Column(name="web_server_redirect_uri")
+    private String webServerRedirectUri;
+
+    private String authorities;
+
+    @Column(name="access_token_validity")
+    private int accessTokenValidity;
+
+    @Column(name="refresh_token_validity")
+    private int refreshTokenValidity;
+
+    @Column(name="additional_information")
+    private String additionalInformation;
+
+    private String autoapprove;
+
+    @Column(name="users_sid")
+    private Long usersSid;
+
+    @Column(name="coins_type")
+    private String coinsType;
+
+    private String name;
+    private String description;
+
+    @Column(name="client_salt")
+    private String clientSalt;
+    
+    private boolean activated = true;
+
+    @CreatedDate
+    @Column(nullable = false, updatable = false, name = "created_at")
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(updatable = true, name = "last_modified_at")
+    private LocalDateTime lastModifiedAt;
+
+
+}

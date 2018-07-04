@@ -1,0 +1,65 @@
+package com.happy.game.lostcity.domain.play;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.domain.Specification;
+
+import com.happy.game.lostcity.common.SearchBean;
+
+public class GameSpecification implements Specification<GameEntity>{
+
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -6322687798110073246L;
+	@Autowired
+	private SearchBean searchBean;
+	
+	public GameSpecification(SearchBean searchBean) {
+		this.searchBean = searchBean;
+	}
+	
+	@Override
+	public Predicate toPredicate(Root<GameEntity> root, CriteriaQuery<?> query, CriteriaBuilder builder) {
+		if (searchBean.getOperation().equalsIgnoreCase(">")) {
+			if (searchBean.getKey().equals("createdAt")) {
+				Long timestamp = Long.valueOf(searchBean.getValue().toString());
+				LocalDateTime triggerTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneOffset.UTC);
+				return builder.greaterThanOrEqualTo(root.<LocalDateTime>get(searchBean.getKey()), triggerTime);
+			}
+			return builder.greaterThanOrEqualTo(root.<String>get(searchBean.getKey()),
+					searchBean.getValue().toString());
+		} else if (searchBean.getOperation().equalsIgnoreCase("<")) {
+			if (searchBean.getKey().equals("createdAt")) {
+				Long timestamp = Long.valueOf(searchBean.getValue().toString());
+				LocalDateTime triggerTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneOffset.UTC);
+				return builder.lessThanOrEqualTo(root.<LocalDateTime>get(searchBean.getKey()), triggerTime);
+			}
+			return builder.lessThanOrEqualTo(root.<String>get(searchBean.getKey()), searchBean.getValue().toString());
+		} else if (searchBean.getOperation().equalsIgnoreCase(":")) {
+			if (root.get(searchBean.getKey()).getJavaType() == String.class) {
+				System.out.println(root.get(searchBean.getKey()));
+				return builder.like(root.<String>get(searchBean.getKey()), "%" + searchBean.getValue() + "%");
+			} else {
+				return builder.equal(root.get(searchBean.getKey()), searchBean.getValue());
+			}
+		} else if (searchBean.getOperation().equalsIgnoreCase(";")) {
+			boolean manage = Boolean.valueOf(searchBean.getValue().toString());
+			if (manage) {
+				return builder.isTrue(root.get(searchBean.getKey()));
+			} else {
+				return builder.isFalse(root.get(searchBean.getKey()));
+			}
+		}
+		return null;
+	}
+	
+}

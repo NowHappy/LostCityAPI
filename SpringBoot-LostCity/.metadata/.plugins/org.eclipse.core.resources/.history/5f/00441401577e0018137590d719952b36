@@ -1,0 +1,12 @@
+package com.happy.game.lostcity.domain.play;
+
+import lombok.Data;
+
+@Data
+public class GamesDto {
+
+	@Data
+	public static class UserResponse{
+		
+	}
+}

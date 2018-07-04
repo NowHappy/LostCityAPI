@@ -1,0 +1,174 @@
+package com.happy.game.lostcity.domain.users;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Order;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.happy.game.lostcity.common.CustomOAuthTokenExtractor;
+import com.happy.game.lostcity.common.DefineException;
+import com.happy.game.lostcity.config.SecurityConfig;
+
+@EnableJpaAuditing
+@Service
+public class UserService implements UserDetailsService {
+
+	@Autowired
+	private UserRepository userRepo;
+
+	@Autowired
+	private ModelMapper modelMapper;
+
+	@Autowired
+	private CustomOAuthTokenExtractor customOAuthTokenExtractor;
+
+	private final Logger logger = LoggerFactory.getLogger(getClass());
+	
+    private final String ORDER_BY_ASC = "asc";
+    private final String ORDER_BY_DESC = "desc";
+    
+    
+    @Value("${promotion.charge}")
+    private String promotionCharge;
+
+	// UserDetailsService impl
+	public UserDetails loadUserByUsername(String id) {
+		UserEntity user = userRepo.findById(id);
+		if (user == null) {
+			throw new UserDefineException.NotFound(id);
+		}
+		
+		return new org.springframework.security.core.userdetails.User(user.getId(), user.getPwd(),
+				getAuthority(false));
+	}
+
+	// UserDetailsService impl
+	private List<SimpleGrantedAuthority> getAuthority(boolean manager) {
+		if (manager) {
+			return Arrays.asList(new SimpleGrantedAuthority("ADMIN"));
+		} else {
+			return Arrays.asList(new SimpleGrantedAuthority("USER"));
+		}
+	}
+
+	@Transactional
+	public UserDto.UserInfo add(HttpServletRequest httpRequest, UserDto.Create user) {
+		if (userRepo.existsById(user.getId())) {
+			// exist
+			throw new UserDefineException.Duplicated(user.getId(), httpRequest);
+		}
+
+		// add
+		user.setPwd(SecurityConfig.userPasswordEncoder().encode(user.getPwd()));
+		//set initial balance from properties
+
+		UserEntity addUser = modelMapper.map(user, UserEntity.class);
+		
+		
+		addUser = userRepo.save(addUser);
+				
+		
+		
+		return modelMapper.map(addUser, UserDto.UserInfo.class);
+	}
+
+	public UserEntity get(HttpServletRequest httpRequest, final Long users_sid) {
+		return userRepo.findById(users_sid)
+				.orElseThrow(() -> new UserDefineException.NotFound(users_sid, httpRequest));
+	}
+	
+	public UserEntity getById(HttpServletRequest httpRequest, final String id) {
+		return Optional.ofNullable(userRepo.findById(id))
+				.orElseThrow(() -> new UserDefineException.NotFound(id, httpRequest));
+	}
+
+	@Transactional
+	public UserEntity update(HttpServletRequest httpRequest, final Long users_sid, UserDto.UserInfo user) {
+		UserEntity updateUser = get(httpRequest, users_sid);
+		updateUser.setName(user.getName());
+
+		// update
+		return userRepo.save(updateUser);
+	}
+
+
+	@Transactional
+	public void delete(HttpServletRequest httpRequest, final Long users_sid) {
+		UserEntity deleteUser = get(httpRequest, users_sid);
+		customOAuthTokenExtractor.removeAuthToken(deleteUser.getId());
+		userRepo.deleteById(users_sid);
+	}
+	
+	public boolean valid(Sort sort) {
+		
+		return true;
+	}
+
+	// changePwd
+	@Transactional
+	public UserEntity changePwd(HttpServletRequest httpRequest, final Long users_sid, UserDto.UserInfo user) {
+		UserEntity updateUser = get(httpRequest, users_sid);
+
+		if (!SecurityConfig.userPasswordEncoder().matches(user.getPwd(), updateUser.getPwd())) {
+			throw new UserDefineException.invalidPwd(updateUser.getId(), httpRequest);
+		}
+
+		if (user.getNew_pwd().equals(user.getPwd())) {
+			throw new UserDefineException.samePwd(updateUser.getId(), httpRequest);
+		}
+		updateUser.setPwd(SecurityConfig.userPasswordEncoder().encode(user.getNew_pwd()));
+		//
+		// update
+		return userRepo.save(updateUser);
+	}
+
+	// resetPwd
+	@Transactional
+	public UserEntity resetPwd(HttpServletRequest httpRequest, final String users_email) {
+		UserEntity updateUser = getById(httpRequest, users_email);
+
+		String pwd = RandomStringUtils.random(16, true, true);
+
+		// System.out.println(pwd);
+		updateUser.setPwd(SecurityConfig.userPasswordEncoder().encode(pwd));
+
+//		// expire user's token
+//		if (customOAuthTokenExtractor.removeAuthToken(updateUser.getId())) {
+//			// send a mail
+//			try {
+//				emailService.sendMailWhenResetPwd(updateUser.getId(), pwd);
+//			} catch (SendFailedException e) {
+//				logger.error(e.toString());
+//				throw new UserDefineException.SendEmailFailed(updateUser.getId(), httpRequest);
+//			}
+//		}
+
+		// update
+		return userRepo.save(updateUser);
+	}
+}

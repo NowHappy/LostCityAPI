@@ -1,0 +1,61 @@
+package com.happy.game.lostcity.common;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.oauth2.common.DefaultOAuth2AccessToken;
+import org.springframework.security.oauth2.common.OAuth2AccessToken;
+import org.springframework.security.oauth2.provider.OAuth2Authentication;
+import org.springframework.security.oauth2.provider.token.TokenEnhancer;
+
+import com.fasoo.blockchain.domain.apps.AppEntity;
+import com.fasoo.blockchain.domain.apps.AppRepository;
+import com.fasoo.blockchain.domain.users.UserEntity;
+import com.fasoo.blockchain.domain.users.UserRepository;
+
+public class CustomOAuthTokenEnhancer implements TokenEnhancer {
+
+    @Autowired
+    private UserRepository userRepo;
+
+    @Autowired
+    private AppRepository appRepo;
+
+    @Override
+    public OAuth2AccessToken enhance(OAuth2AccessToken accessToken,
+                                    OAuth2Authentication authentication) {
+        String grantType = authentication.getOAuth2Request().getGrantType();
+        Map<String, Object> userInfo = null;
+        if (grantType.equalsIgnoreCase("password")) {
+            String email = authentication.getUserAuthentication().getName();
+			UserEntity user = userRepo.findByEmail(email);
+			userInfo = new HashMap<>();
+			userInfo.put("sid", user.getSid());
+			userInfo.put("email", user.getEmail());
+			userInfo.put("name", user.getName());
+			userInfo.put("balance", user.getBalance());
+			userInfo.put("created_at", user.getCreatedAt());
+			userInfo.put("last_modified_at", user.getLastModifiedAt());
+		} else if (grantType.equalsIgnoreCase("client_credentials")) {
+            String client_id = authentication.getOAuth2Request().getClientId();
+            AppEntity app = appRepo.findByClientId(client_id);
+            Optional<UserEntity> user = userRepo.findById(app.getUsersSid());
+            if (user.isPresent()) {
+                userInfo = new HashMap<>();
+                userInfo.put("sid", user.get().getSid());
+                userInfo.put("email", user.get().getEmail());
+                userInfo.put("name", user.get().getName());
+                userInfo.put("balance", user.get().getBalance());
+                userInfo.put("created_at", user.get().getCreatedAt());
+                userInfo.put("last_modified_at", user.get().getLastModifiedAt());
+            }
+        }
+
+        Map<String, Object> additionalInfo = new HashMap<>();
+        additionalInfo.put("users", userInfo);
+        ((DefaultOAuth2AccessToken) accessToken).setAdditionalInformation(additionalInfo);
+        return accessToken;
+    }
+}
